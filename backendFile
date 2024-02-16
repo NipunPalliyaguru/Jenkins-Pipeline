@@ -1,0 +1,57 @@
+pipeline {
+    agent any
+    
+    environment {
+        JAVA_HOME = 'JAVA_HOME'
+        MAVEN_HOME = 'ACRS-MAVEN'
+        localDeployDir = '/home/acrs/TestJar'
+        remoteServer = '192.168.20.140'
+        remotePort = '22'
+    }
+
+    tools {
+        jdk 'JAVA_HOME'
+        maven 'ACRS-MAVEN'
+    }
+    
+    stages {
+        stage('Checking mvn version') {
+            steps {
+                script {
+                    sh 'mvn -v'
+                }
+            }
+        }
+
+        stage('Repo Cloning') {
+            steps {
+                script {
+                    git branch: 'development', credentialsId: '50908673-38e2-4e91-b1a7-ce2bcd6a29a9', url: 'http://epictechdev.com:8081/EPIC_ACRS/EPIC_ACRS'
+                }
+            }
+        }
+
+        stage('Clean and Install') {
+            steps {
+                script {
+                    sh "mvn clean package install -DskipTests"
+                }
+            }
+        }
+
+        stage('Building Jar Files') {
+            steps {
+                script {
+                    def modules = ["ACRS_MAIN"]
+                    
+                    for (module in modules) {
+                        sshagent(credentials: ['asrcMainKey']) {
+                            def localJarPath = "${env.WORKSPACE}/${module}/target/EPIC_ACRS_V1.00.00.jar"
+                            sh "scp -P ${remotePort} -v ${localJarPath} epic@${remoteServer}:${localDeployDir}/${module}/target/EPIC_ACRS_V1.00.00.jar"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
